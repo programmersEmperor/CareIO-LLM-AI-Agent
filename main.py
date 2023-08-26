@@ -1,10 +1,13 @@
 from fastapi import FastAPI, status, Header
 from fastapi.exceptions import RequestValidationError
 from langchain.chat_models import ChatOpenAI
+
+from AI.Models.DBAIModel import DBAIModel
 from AI.Models.DoctorAIModel import DoctorAIModel
 from AI.Models.IFModel import IfModel
 from AI.Models.SecretaryAIModel import SecretaryAIModel
 from AI.Models.SummarizerModel import SummarizerModel
+from AI.Tools.DBTool import DBTool
 from AI.Tools.SearchTool import SearchTool
 from Interface.Models.chatMessageModel import ChatMessage
 from Interface.Utilities.Authorizer import Authorizer
@@ -20,6 +23,14 @@ searchTool = SearchTool(
     description='useful for when you need to answer questions about current events',
     sites=['www.cdc.gov', 'www.healthline.com']
 )
+dbAIModel = DBAIModel(
+    llm=llm,
+)
+dbTool = DBTool(
+    name="People Database Table",
+    description='useful for when you need to deal with people data from database',
+    db_model=dbAIModel
+)
 summarizer = SummarizerModel(
     llm=llm,
 )
@@ -33,7 +44,8 @@ ifAI = IfModel(
 # secretary = SecretaryAIModel(
 #     llm=llm,
 #     tools=[
-#         SearchTool
+#         SearchTool,
+#
 #     ]
 # )
 
@@ -68,8 +80,8 @@ conversation = [
 
 @app.get('/test')
 async def test():
-    response = searchTool.run('suger')
-    print(response)
+    response = dbTool.run("what are the names' of the people")
+    print("the response: " + response)
     return Responser.respond(200, 'successful', response)
 
 
