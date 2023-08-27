@@ -1,45 +1,40 @@
 from fastapi import FastAPI, status, Header
 from fastapi.exceptions import RequestValidationError
 from langchain.chat_models import ChatOpenAI
-from AI.Models.DBAIModel import DBAIModel
-from AI.Models.DoctorAIModel import DoctorAIModel
-from AI.Models.IFModel import IfModel
-from AI.Models.SecretaryAIModel import SecretaryAIModel
 from AI.Models.SecretaryIFModel import SecretaryIFModel
 from AI.Models.SummarizerModel import SummarizerModel
-from AI.Tools.DBTool import DBTool
-from AI.Tools.DoctorTool import DoctorTool
-from AI.Tools.SearchTool import SearchTool
 from Interface.Models.chatMessageModel import ChatMessage
 from Interface.Utilities.Authorizer import Authorizer
 from Interface.Utilities.Exceptioner import Exceptioner
 from Interface.Utilities.Responser import Responser
 from Interface.Models.bodyModel import Body
+from langchain.callbacks import get_openai_callback
+
 
 app = FastAPI()
 llm = ChatOpenAI(openai_api_key='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', temperature=0)
 
-searchTool = SearchTool(
-    name='Search',
-    description='useful for when you need to answer questions about current events',
-    sites=['www.cdc.gov', 'www.healthline.com']
-)
-doctorModel = DoctorAIModel(
-    llm=llm,
-)
-doctorTool = DoctorTool(
-    name="Medical Knowledge",
-    description="useful for when you need to answer any medical questions",
-    model=doctorModel
-)
-dbAIModel = DBAIModel(
-    llm=llm,
-)
-dbTool = DBTool(
-    name="People Database Table",
-    description='useful for when you need to deal with people data from database',
-    model=dbAIModel
-)
+# searchTool = SearchTool(
+#     name='Search',
+#     description='useful for when you need to answer questions about current events',
+#     sites=['www.cdc.gov', 'www.healthline.com']
+# )
+# doctorModel = DoctorAIModel(
+#     llm=llm,
+# )
+# doctorTool = DoctorTool(
+#     name="Medical Knowledge",
+#     description="useful for when you need to answer any medical questions",
+#     model=doctorModel
+# )
+# dbAIModel = DBAIModel(
+#     llm=llm,
+# )
+# dbTool = DBTool(
+#     name="People Database Table",
+#     description='useful for when you need to deal with people data from database',
+#     model=dbAIModel
+# )
 summarizer = SummarizerModel(
     llm=llm,
 )
@@ -59,28 +54,27 @@ async def exception_handler(request, exc):
     return Responser.respond(exc.error_status, exc.message, exc.result)
 
 
-fakeDB = [{'id': 1, 'name': 'ali'}, {'id': 2, 'name': 'waleed'}]
-conversation = [
-    ChatMessage.parse_obj({
-        "role": "patient",
-        "content": "Hello there, I am Mutasim"
-    }),
-    ChatMessage.parse_obj({
-        "role": "dr",
-        "content": "Nice to meet you. How can I help you?"
-    }),
-    ChatMessage.parse_obj({
-        "role": "patient",
-        "content": "what is the sum of 2 + 2?"
-    })
-]
-
+# fakeDB = [{'id': 1, 'name': 'ali'}, {'id': 2, 'name': 'waleed'}]
+# conversation = [
+#     ChatMessage.parse_obj({
+#         "role": "patient",
+#         "content": "Hello there, I am Mutasim"
+#     }),
+#     ChatMessage.parse_obj({
+#         "role": "dr",
+#         "content": "Nice to meet you. How can I help you?"
+#     }),
+#     ChatMessage.parse_obj({
+#         "role": "patient",
+#         "content": "what is the sum of 2 + 2?"
+#     })
+# ]
 
 @app.get('/test')
 async def test(message: str):
-    response = secretary.handle('', message)
-    print(response)
-    return Responser.respond(200, 'successful', {'summary': '', 'response': response})
+    with get_openai_callback() as tokenizer:
+        response = secretary.handle('', message)
+        return Responser.respond(200, 'successful', {'summary': '', 'response': response, 'prompt tokens': tokenizer.prompt_tokens, 'completion tokens': tokenizer.completion_tokens, 'cost': tokenizer.total_cost})
 
 
 @app.post('/talkToDoctorAI')
@@ -99,16 +93,17 @@ async def talk_with_doctor_ai(body: Body, authorization: str = Header(None)):
             "HTTP_406_NOT_ACCEPTABLE",
         )
 
-    # summarization
-    new_summary = ''
-    chats_to_answer = Body.chats[-1]
-    if len(body.chats) == 3:
-        chats_to_summarized = Body.chats[0:2]
-        memory = summarizer.prompt_format(summary=body.summary, conversation=chats_to_summarized)
-        new_summary = summarizer.handle(memory)
+    with get_openai_callback() as tokenizer:
+        # summarization
+        new_summary = ''
+        chats_to_answer = body.chats[-1]
+        if len(body.chats) == 3:
+            chats_to_summarized = body.chats[0:2]
+            memory = summarizer.prompt_format(summary=body.summary, conversation=chats_to_summarized)
+            new_summary = summarizer.handle(memory)
 
-    # handling the request
-    response = secretary.handle(new_summary, chats_to_answer.content)
+        # handling the request
+        response = secretary.handle(new_summary, chats_to_answer.content)
 
-    # returning response
-    return Responser.respond(200, 'successful operation', {'summary': new_summary, 'response': response})
+        # returning response
+        return Responser.respond(200, 'successful operation', {'summary': new_summary, 'response': response, 'prompt tokens': tokenizer.prompt_tokens, 'completion tokens': tokenizer.completion_tokens, 'cost': tokenizer.total_cost})
