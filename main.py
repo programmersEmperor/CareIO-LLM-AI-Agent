@@ -3,7 +3,6 @@ from fastapi.exceptions import RequestValidationError
 from langchain.chat_models import ChatOpenAI
 from AI.Models.SecretaryIFModel import SecretaryIFModel
 from AI.Models.SummarizerModel import SummarizerModel
-from Interface.Models.chatMessageModel import ChatMessage
 from Interface.Utilities.Authorizer import Authorizer
 from Interface.Utilities.Exceptioner import Exceptioner
 from Interface.Utilities.Responser import Responser
