@@ -15,7 +15,7 @@ class DBAIModel(IModel):
     def __init__(self, llm: ChatOpenAI):
         driver = 'ODBC+Driver+17+for+SQL+Server'
         server = 'ROWAD-SERVER'
-        database = 'test'
+        database = 'drAI'
         username = 'ai3'
         password = '12345'
 
@@ -32,6 +32,5 @@ class DBAIModel(IModel):
         )
 
     def handle(self, request: str):
-        print("in the Model" + request)
         return self._agent.run(request)
 

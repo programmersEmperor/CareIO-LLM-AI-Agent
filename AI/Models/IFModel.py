@@ -34,9 +34,9 @@ output:'''
         rules = kwargs['rules']
         value = kwargs['value']
 
-        if not isinstance(rules, dict) or len(rules) < 1:
+        if (not isinstance(rules, dict)) or len(rules) < 1:
             raise Exception('rules argument must be dict')
-        if not isinstance(value, str) or len(rules) < 1:
+        if (not isinstance(value, str)) or len(rules) < 1:
             raise Exception('value argument must be string ')
 
         rules_block = ',\n'.join([f'if {rule} then the output is "{result}"' for rule, result in rules.items()])

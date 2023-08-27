@@ -1,58 +1,56 @@
 from langchain import LLMChain
 from langchain.prompts import StringPromptTemplate
+from langchain.schema import SystemMessage, HumanMessage
+
 from AI.Utilities.CustomAgent import CustomAgent
 from AI.Utilities.CustomAgentOutputParser import CustomAgentOutputParser
 from AI.Utilities.CustomAgentPromptTemplate import CustomAgentPromptTemplate
 from AI.Models.IModel import IModel
 from langchain.chat_models import ChatOpenAI
 
+from Interface.Models.chatMessageModel import ChatMessage
+
 
 class DoctorAIModel(IModel):
     _llm: ChatOpenAI
-    _tools: list
-    _template: str
-    _agent: CustomAgent
-    _prompt: StringPromptTemplate
+    _systemPrompt = '''you are a professional doctor who helps people diagnose their illnesses accurately.
 
-    def __init__(self, llm: ChatOpenAI, tools: list):
+RULES:  
+You must answer only medical questions.
+You must not ask more than one question in your turn.
+You must ask only one question in your turn.
+You must ask the next question based on the patients answers.
+Questions must be in "Yes/No Questions Format". 
+Questions must specific.
+You must consider all the possibles.
+Keep asking until you surly diagnose the correct illness.
+Speak the same language as the last message.
+'''
+
+    def __init__(self, llm: ChatOpenAI):
         self._llm = llm
-        self._tools = tools
-        self._template = """
-You are a helpful assistant who can answer anything.
-Complete the objective as best you can.
-You have access to the following tools:
-
-{tools}
-
-if no tool is 
-
-Use the following format:
-
-Question: the input question you must answer
-Thought: you should always think about what to do
-Action: the action to take, should be one of [{tool_names}]
-Action Input: the input to the action
-Observation: the result of the action
-... (this Thought/Action/Action Input/Observation can repeat N times)
-Thought: I now know the final answer
-Final Answer: the final answer to the original input question following by the ending
-
-These were previous tasks you completed:
-
-
-
-Begin! 
-
-Question: {input}
-{agent_scratchpad}"""
-        self._prompt = CustomAgentPromptTemplate(
-            template=self._template,
-            tools=self._tools,
-            input_variables=["input", "intermediate_steps"]
-        )
-        self._agent = CustomAgent(chain=LLMChain(llm=llm, prompt=self._prompt), output_parser=CustomAgentOutputParser(),
-                                  tools=self._tools)
 
     def handle(self, request: str):
-        return self._agent.handle(request)
+        messages = [
+            SystemMessage(content=self._systemPrompt),
+            HumanMessage(content=request)
+        ]
+        return self._llm(messages).content
 
+    @staticmethod
+    def prompt_format(**kwargs):
+        summary = kwargs['summary']
+        message = kwargs['message']
+
+        if not isinstance(summary, str):
+            raise Exception('summary argument must be str')
+        if not isinstance(message, str):
+            raise Exception('message argument must be str')
+
+        context = ''
+
+        if len(summary) > 0:
+            context += f'SUMMARY:\n{summary}'
+        context += f'CONVERSATION:\npatient: {message}' + '\ndr:'
+
+        return context

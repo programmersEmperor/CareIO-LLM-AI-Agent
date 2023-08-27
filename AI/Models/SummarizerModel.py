@@ -53,8 +53,6 @@ New summary:'''
             memory += f'Current summary:\n{summary}'
 
         if len(conversation) > 0:
-            memory += '\nCurrent conversation:'
-            for message in conversation:
-                memory += f'\n{message.role.value}: {message.content}'
+            memory += '\nCurrent conversation:' + "\n".join([f'{message.role.value}: {message.content}' for message in conversation])
 
         return self._prompt.format(memory=memory)

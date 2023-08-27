@@ -1,13 +1,14 @@
 from fastapi import FastAPI, status, Header
 from fastapi.exceptions import RequestValidationError
 from langchain.chat_models import ChatOpenAI
-
 from AI.Models.DBAIModel import DBAIModel
 from AI.Models.DoctorAIModel import DoctorAIModel
 from AI.Models.IFModel import IfModel
 from AI.Models.SecretaryAIModel import SecretaryAIModel
+from AI.Models.SecretaryIFModel import SecretaryIFModel
 from AI.Models.SummarizerModel import SummarizerModel
 from AI.Tools.DBTool import DBTool
+from AI.Tools.DoctorTool import DoctorTool
 from AI.Tools.SearchTool import SearchTool
 from Interface.Models.chatMessageModel import ChatMessage
 from Interface.Utilities.Authorizer import Authorizer
@@ -23,31 +24,28 @@ searchTool = SearchTool(
     description='useful for when you need to answer questions about current events',
     sites=['www.cdc.gov', 'www.healthline.com']
 )
+doctorModel = DoctorAIModel(
+    llm=llm,
+)
+doctorTool = DoctorTool(
+    name="Medical Knowledge",
+    description="useful for when you need to answer any medical questions",
+    model=doctorModel
+)
 dbAIModel = DBAIModel(
     llm=llm,
 )
 dbTool = DBTool(
     name="People Database Table",
     description='useful for when you need to deal with people data from database',
-    db_model=dbAIModel
+    model=dbAIModel
 )
 summarizer = SummarizerModel(
     llm=llm,
 )
-doctor_ai = DoctorAIModel(
+secretary = SecretaryIFModel(
     llm=llm,
-    tools=[]
 )
-ifAI = IfModel(
-    llm=llm
-)
-# secretary = SecretaryAIModel(
-#     llm=llm,
-#     tools=[
-#         SearchTool,
-#
-#     ]
-# )
 
 
 @app.exception_handler(RequestValidationError)
@@ -64,25 +62,25 @@ async def exception_handler(request, exc):
 fakeDB = [{'id': 1, 'name': 'ali'}, {'id': 2, 'name': 'waleed'}]
 conversation = [
     ChatMessage.parse_obj({
-        "role": "human",
+        "role": "patient",
         "content": "Hello there, I am Mutasim"
     }),
     ChatMessage.parse_obj({
-        "role": "AI",
+        "role": "dr",
         "content": "Nice to meet you. How can I help you?"
     }),
     ChatMessage.parse_obj({
-        "role": "human",
+        "role": "patient",
         "content": "what is the sum of 2 + 2?"
     })
 ]
 
 
 @app.get('/test')
-async def test():
-    response = dbTool.run("what are the names' of the people")
-    print("the response: " + response)
-    return Responser.respond(200, 'successful', response)
+async def test(message: str):
+    response = secretary.handle('', message)
+    print(response)
+    return Responser.respond(200, 'successful', {'summary': '', 'response': response})
 
 
 @app.post('/talkToDoctorAI')
@@ -102,7 +100,15 @@ async def talk_with_doctor_ai(body: Body, authorization: str = Header(None)):
         )
 
     # summarization
-    memory = summarizer.prompt_format(summary=body.summary, conversation=Body.chats)
-    response = summarizer.handle(memory)
+    new_summary = ''
+    chats_to_answer = Body.chats[-1]
+    if len(body.chats) == 3:
+        chats_to_summarized = Body.chats[0:2]
+        memory = summarizer.prompt_format(summary=body.summary, conversation=chats_to_summarized)
+        new_summary = summarizer.handle(memory)
 
-    return Responser.respond(200, 'successful operation', 'AI: how can I help you?')
+    # handling the request
+    response = secretary.handle(new_summary, chats_to_answer.content)
+
+    # returning response
+    return Responser.respond(200, 'successful operation', {'summary': new_summary, 'response': response})
