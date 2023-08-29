@@ -11,7 +11,7 @@ from langchain.callbacks import get_openai_callback
 
 
 app = FastAPI()
-llm = ChatOpenAI(openai_api_key='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', temperature=0)
+llm = ChatOpenAI(openai_api_key='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', temperature=0, verbose=True)
 
 # searchTool = SearchTool(
 #     name='Search',
@@ -70,9 +70,9 @@ async def exception_handler(request, exc):
 # ]
 
 @app.get('/test')
-async def test(message: str):
+async def test(message: str, user_id: int):
     with get_openai_callback() as tokenizer:
-        response = secretary.handle('', message)
+        response = secretary.handle(user_id, '', message)
         return Responser.respond(200, 'successful', {'summary': '', 'response': response, 'prompt tokens': tokenizer.prompt_tokens, 'completion tokens': tokenizer.completion_tokens, 'cost': tokenizer.total_cost})
 
 
@@ -102,7 +102,7 @@ async def talk_with_doctor_ai(body: Body, authorization: str = Header(None)):
             new_summary = summarizer.handle(memory)
 
         # handling the request
-        response = secretary.handle(new_summary, chats_to_answer.content)
+        response = secretary.handle(body.id, new_summary, chats_to_answer.content)
 
         # returning response
         return Responser.respond(200, 'successful operation', {'summary': new_summary, 'response': response, 'prompt tokens': tokenizer.prompt_tokens, 'completion tokens': tokenizer.completion_tokens, 'cost': tokenizer.total_cost})

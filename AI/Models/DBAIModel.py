@@ -16,33 +16,67 @@ class DBAIModel(IModel):
     _agent: create_sql_agent
     _custom_table_schema = {
         "Clients": """CREATE TABLE Clients (
-    "Id" INTEGER NOT NULL, 
-    "Name" NVARCHAR(200) NOT NULL,
-    PRIMARY KEY ("Id")
+"Id" INTEGER NOT NULL, 
+"Name" NVARCHAR(200) NOT NULL,
+PRIMARY KEY ("Id")
 )
 """,
     }
-    _template = """Given an input question, first create a syntactically correct {dialect} query to run, then look at the results of the query and return the answer.
-    Use the following format:
+    _custom_sql_prefix = """You are an expert agent designed to interact with a MS SQL database.
+Given an input question, create a syntactically correct MS SQL query to run, 
+then look at the results of the query and return the answer.
+Unless the user specifies a specific number of examples they wish to obtain, 
+always limit your query to at most {top_k} results.
+You can order the results by a relevant column to return the most interesting examples in the database.
+Never query for all the columns from a specific table, 
+only ask for the relevant columns given the question.
+You have access to tools for interacting with the database.
+Only use the below tools. Only use the information returned by the below tools to construct your final answer.
+You MUST double check your query before executing it. If you get an error while executing a query, 
+rewrite the query and try again.
+Wrap each column name in square brackets ([]) to denote them as delimited identifiers.
+Pay attention to use only the column names you can see in the tables below. Be careful to not query for columns that do not exist. Also, pay attention to which column is in which table.
+Pay attention to use CAST(GETDATE() as date) function to get the current date, if the question involves "today".
 
-    Question: "Question here"
-    SQLQuery: "SQL Query to run"
-    SQLResult: "Result of the SQLQuery"
-    Answer: "Final answer here"
+DO NOT make any DML statements (INSERT, UPDATE, DELETE, DROP etc.) to the database.
 
-    Only use the following tables:
+You MUST NEVER return any "PRIMARY KEYS", "FOREIGN KEYS" or "IDs".
+You MUST use "SQL Like Operator" when comparing with string value columns.
+You MUST filter "Appointments" rows by comparing ClientId with keyId.  
+You MUST filter "Clients" rows by comparing Id with keyId.  
 
-    {table_info}
+If the question does not seem related to the database, just return "I don't know" as the answer.
+    """
+    _custom_sql_suffix = "I should look at the tables in the database to see what I can query.  Then I should query the schema of the most relevant tables."
 
-    Rules:
-    You must never include any primary keys or foreign keys in the answer.
-    You must use SQL Like Operator when comparing with string value column.
-    You must return "Appointments" rows which their userId is equal to keyId.  
-    You must return "Users" rows which their userId is equal to keyId.  
-    Question: {input}"""
-    _prompt = PromptTemplate(
-        input_variables=["input", "table_info", "dialect"], template=_template
-    )
+#     _mssql_template = """You are an MS SQL expert. Given an input question, first create a syntactically correct MS SQL query to run, then look at the results of the query and return the answer to the input question.
+#     Unless the user specifies in the question a specific number of examples to obtain, query for at most {top_k} results using the TOP clause as per MS SQL. You can order the results to return the most informative data in the database.
+#     Never query for all columns from a table. You must query only the columns that are needed to answer the question. Wrap each column name in square brackets ([]) to denote them as delimited identifiers.
+#     Pay attention to use only the column names you can see in the tables below. Be careful to not query for columns that do not exist. Also, pay attention to which column is in which table.
+#     Pay attention to use CAST(GETDATE() as date) function to get the current date, if the question involves "today".
+#
+#     Use the following format:
+#
+#     Question: Question here
+#     SQLQuery: SQL Query to run
+#     SQLResult: Result of the SQLQuery
+#     Answer: Final answer here
+#
+#     Only use the following tables:
+#     {table_info}
+#
+#     Rules:
+#     You must never include any "Primary Keys", "Foreign Keys" or "IDs" in the Answer.
+#     You must use "SQL Like Operator" when comparing with string value columns.
+#     You must return "Appointments" rows which only their ClientId is equal to keyId.
+#     You must return "Clients" rows which only their Id is equal to keyId.
+#     Answer must be like a normal humane chat
+#
+# Question: {input}"""
+#     _prompt = PromptTemplate(
+#         input_variables=["input", "table_info", "top_k"],
+#         template=_mssql_template,
+#     )
 
     def __init__(self, llm: ChatOpenAI):
         driver = 'ODBC+Driver+17+for+SQL+Server'
@@ -54,18 +88,20 @@ class DBAIModel(IModel):
         # conn = f'mssql+pyodbc://{username}:{password}@{server}/{database}?driver={driver}'
         conn = f'mssql+pyodbc:///?driver={driver}&server={server}&database={database}&trusted_connection=yes'
         db = SQLDatabase.from_uri(conn, include_tables=['Clients', 'Doctors', 'Appointments', 'Specialisms'], custom_table_info=self._custom_table_schema)
-        self._chain = SQLDatabaseChain.from_llm(llm, db, verbose=True, return_direct=False, use_query_checker=True, prompt=self._prompt)
+        # self._chain = SQLDatabaseChain.from_llm(llm, db, verbose=True, return_direct=False, use_query_checker=True, prompt=self._prompt)
 
-        # toolkit = SQLDatabaseToolkit(db=db, llm=llm)
-        #
-        # self._agent = create_sql_agent(
-        #     llm=llm,
-        #     toolkit=toolkit,
-        #     verbose=True,
-        #     agent_type=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
-        #
-        # )
+        toolkit = SQLDatabaseToolkit(db=db, llm=llm)
 
-    def handle(self, request: str):
-        return self._chain.run(request)
-        # return self._agent.run(request)
+        self._agent = create_sql_agent(
+            llm=llm,
+            toolkit=toolkit,
+            verbose=True,
+            # agent_type=AgentType.OPENAI_FUNCTIONS,
+            prefix=self._custom_sql_prefix,
+            # suffix=self._custom_sql_suffix
+        )
+
+    def handle(self, request: str, user_id: int):
+        command = request + f".\nkeyId={user_id}."
+        # return self._chain.run(command)
+        return self._agent.run(command)
