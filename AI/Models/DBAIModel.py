@@ -38,15 +38,20 @@ Wrap each column name in square brackets ([]) to denote them as delimited identi
 Pay attention to use only the column names you can see in the tables below. Be careful to not query for columns that do not exist. Also, pay attention to which column is in which table.
 Pay attention to use CAST(GETDATE() as date) function to get the current date, if the question involves "today".
 
-DO NOT make any DML statements (INSERT, UPDATE, DELETE, DROP etc.) to the database.
-
-You MUST NEVER return any "PRIMARY KEYS", "FOREIGN KEYS" or "IDs".
-You MUST use "SQL Like Operator" when comparing with string value columns.
-You MUST filter "Appointments" rows by comparing ClientId with keyId.  
-You MUST filter "Clients" rows by comparing Id with keyId.  
+DO NOT make any DML statements (INSERT, UPDATE, DELETE, DROP etc.) to the database.  
 
 If the question does not seem related to the database, just return "I don't know" as the answer.
     """
+    _custom_sql_instructions = """Use the following format:
+
+Question: the input question you must answer
+Thought: you should always think about what to do
+Action: the action to take, should be one of [{tool_names}]
+Action Input: the input to the action
+Observation: the result of the action
+... (this Thought/Action/Action Input/Observation can repeat N times)
+Thought: I now know the final answer
+Final Answer: the final answer to the original input question."""
     _custom_sql_suffix = "I should look at the tables in the database to see what I can query.  Then I should query the schema of the most relevant tables."
 
 #     _mssql_template = """You are an MS SQL expert. Given an input question, first create a syntactically correct MS SQL query to run, then look at the results of the query and return the answer to the input question.
@@ -96,12 +101,25 @@ If the question does not seem related to the database, just return "I don't know
             llm=llm,
             toolkit=toolkit,
             verbose=True,
-            # agent_type=AgentType.OPENAI_FUNCTIONS,
+            agent_type=AgentType.OPENAI_FUNCTIONS,
             prefix=self._custom_sql_prefix,
+            # format_instructions=self._custom_sql_instructions,
             # suffix=self._custom_sql_suffix
         )
 
     def handle(self, request: str, user_id: int):
-        command = request + f".\nkeyId={user_id}."
+        command = (
+                request + ".\n" +
+                f"keyId={user_id}.\n" +
+                """RULES:
+You MUST NOT return "IDs"
+You MUST use "SQL Like Operator" when comparing with string value columns.
+You MUST filter "Appointments" rows by comparing ClientId with keyId.  
+You MUST filter "Clients" rows by comparing Id with keyId. 
+
+Create Query Based On the RULES.
+Run Query.
+Query Result:""")
         # return self._chain.run(command)
+
         return self._agent.run(command)
