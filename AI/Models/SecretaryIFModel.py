@@ -24,7 +24,6 @@ class SecretaryIFModel(IModel):
         self._doctor = DoctorAIModel(self._llm)
         self._databaser = DBAIModel(self._llm)
         self._rules = {"input is about 'appointments' or 'doctors' or 'hospitals'": '1', 'not': '0'}
-        # self._rules = {"input is about database tables or views": '1', 'not': '0'}
 
     def handle(self, user_id: int, summary: str, message: str) -> str:
         response = ''
@@ -36,5 +35,18 @@ class SecretaryIFModel(IModel):
                 print('doctor is called')
                 context = self._doctor.prompt_format(summary=summary, message=message)
                 response = self._doctor.handle(context)
+                response += self.suggest_doctors(user_id, response)
 
         return response
+
+    def suggest_doctors(self, user_id: int, diagnosis: str) -> str:
+        rules = {"input is a diagnosis": 'the diagnosis disease', 'not': '0'}
+        response = ''
+        disease = self._ifModel.handle(rules=rules, value=diagnosis)
+        if disease != '0':
+            message = "recommend the best 3 doctors which their specialism is the most related to " + disease + " based on rating and number of appointments"
+            response = '.\n' + self._databaser.handle(message, user_id=user_id)
+
+        return response
+
+
