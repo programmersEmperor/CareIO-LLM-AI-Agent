@@ -71,9 +71,10 @@ async def exception_handler(request, exc):
 
 @app.get('/test')
 async def test(message: str, user_id: int):
-    with get_openai_callback() as tokenizer:
-        response = secretary.handle(user_id, '', message)
-        return Responser.respond(200, 'successful', {'summary': '', 'response': response, 'prompt tokens': tokenizer.prompt_tokens, 'completion tokens': tokenizer.completion_tokens, 'cost': tokenizer.total_cost})
+    #with get_openai_callback() as tokenizer:
+        #response = secretary.handle(user_id, '', message)
+        response = 'server running successfully'
+        return Responser.respond(200, 'successful', {'summary': '', 'response': response, 'prompt tokens': 0, 'completion tokens': 0, 'cost': 0})
 
 
 @app.post('/talkToDoctorAI')
