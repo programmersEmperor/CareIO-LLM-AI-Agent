@@ -11,7 +11,8 @@ from langchain.callbacks import get_openai_callback
 
 
 app = FastAPI()
-llm = ChatOpenAI(openai_api_key='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', temperature=0, verbose=True)
+#llm = ChatOpenAI(openai_api_key='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', temperature=0, verbose=True)
+llm = ChatOpenAI(openai_api_key='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', temperature=0, verbose=True)
 
 # searchTool = SearchTool(
 #     name='Search',
