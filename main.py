@@ -9,9 +9,8 @@ from Interface.Utilities.Responser import Responser
 from Interface.Models.bodyModel import Body
 from langchain.callbacks import get_openai_callback
 
-
 app = FastAPI()
-#llm = ChatOpenAI(openai_api_key='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', temperature=0, verbose=True)
+# llm = ChatOpenAI(openai_api_key='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', temperature=0, verbose=True)
 llm = ChatOpenAI(openai_api_key='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', temperature=0, verbose=True)
 
 # searchTool = SearchTool(
@@ -72,12 +71,46 @@ async def exception_handler(request, exc):
 
 @app.get('/test')
 async def test():
-        response = 'server running successfully'
-        return Responser.respond(200, 'successful', response)
+    response = 'server running successfully'
+    return Responser.respond(200, 'successful', response)
 
 
-@app.post('/talkToDoctorAI')
-async def talk_with_doctor_ai(body: Body, authorization: str = Header(None)):
+@app.post('/testTalkToDoctor')
+async def test_talk_with_doctor(body: Body, authorization: str = Header(None)):
+    # validation
+    if not Authorizer.is_authorized(authorization):
+        raise Exceptioner(
+            status.HTTP_401_UNAUTHORIZED,
+            "unauthorized",
+            "HTTP_401_UNAUTHORIZED",
+        )
+    if len(body.chats) > 3:
+        raise Exceptioner(
+            status.HTTP_406_NOT_ACCEPTABLE,
+            "chats number should be less than 4",
+            "HTTP_406_NOT_ACCEPTABLE",
+        )
+
+    with get_openai_callback() as tokenizer:
+        # summarization
+        new_summary = ''
+        chats_to_answer = body.chats[-1]
+        if len(body.chats) == 3:
+            chats_to_summarized = body.chats[0:2]
+            new_summary = "new summary"
+
+        # handling the request
+        response = "AI Response"
+
+        # returning response
+        return Responser.respond(200, 'successful operation', {'summary': new_summary, 'response': response,
+                                                               'prompt tokens': tokenizer.prompt_tokens,
+                                                               'completion tokens': tokenizer.completion_tokens,
+                                                               'cost': tokenizer.total_cost})
+
+
+@app.post('/talkToDoctor')
+async def talk_with_doctor(body: Body, authorization: str = Header(None)):
     # validation
     if not Authorizer.is_authorized(authorization):
         raise Exceptioner(
@@ -105,4 +138,7 @@ async def talk_with_doctor_ai(body: Body, authorization: str = Header(None)):
         response = secretary.handle(body.id, new_summary, chats_to_answer.content)
 
         # returning response
-        return Responser.respond(200, 'successful operation', {'summary': new_summary, 'response': response, 'prompt tokens': tokenizer.prompt_tokens, 'completion tokens': tokenizer.completion_tokens, 'cost': tokenizer.total_cost})
+        return Responser.respond(200, 'successful operation', {'summary': new_summary, 'response': response,
+                                                               'prompt tokens': tokenizer.prompt_tokens,
+                                                               'completion tokens': tokenizer.completion_tokens,
+                                                               'cost': tokenizer.total_cost})
