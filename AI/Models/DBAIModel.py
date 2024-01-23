@@ -87,7 +87,7 @@ Final Answer: the final answer to the original input question."""
 
     def __init__(self, llm: ChatOpenAI):
         # mysql connection
-        conn = "mysql+pymysql://root:@127.0.0.1:3306/careiodb"
+        conn = "mysql+pymysql://careiodbUser:GnmWj6tEE97hZ24oTuS0@127.0.0.1:3306/careiodb"
 
         # sql server connection
         # driver = 'ODBC+Driver+17+for+SQL+Server'
