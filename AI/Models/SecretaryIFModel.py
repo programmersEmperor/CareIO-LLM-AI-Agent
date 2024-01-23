@@ -20,25 +20,25 @@ class SecretaryIFModel(IModel):
 
     def __init__(self, llm: ChatOpenAI):
         self._llm = llm
-        #self._ifModel = IfModel(self._llm)
+        self._ifModel = IfModel(self._llm)
         self._doctor = DoctorAIModel(self._llm)
-        #self._databaser = DBAIModel(self._llm)
+        self._databaser = DBAIModel(self._llm)
         self._rules = {"input is about 'appointments' or 'doctors' or 'hospitals'": '1', 'not': '0'}
 
     def handle(self, user_id: int, summary: str, message: str) -> str:
         response = ''
-        # match self._ifModel.handle(rules=self._rules, value=message):
-        #     case '1':  # call database agent
-        #         print('databaser is called')
-        #         response = self._databaser.handle(message, user_id=user_id)
-        #     case '0':  # call medical model
-        #         print('doctor is called')
-        #         context = self._doctor.prompt_format(summary=summary, message=message)
-        #         response = self._doctor.handle(context)
-        #         response += self.suggest_doctors(user_id, response)
+        match self._ifModel.handle(rules=self._rules, value=message):
+            case '1':  # call database agent
+                print('databaser is called')
+                response = self._databaser.handle(message, user_id=user_id)
+            case '0':  # call medical model
+                print('doctor is called')
+                context = self._doctor.prompt_format(summary=summary, message=message)
+                response = self._doctor.handle(context)
+                response += self.suggest_doctors(user_id, response)
 
-        context = self._doctor.prompt_format(summary=summary, message=message)
-        response = self._doctor.handle(context)
+        # context = self._doctor.prompt_format(summary=summary, message=message)
+        # response = self._doctor.handle(context)
 
         return response
 

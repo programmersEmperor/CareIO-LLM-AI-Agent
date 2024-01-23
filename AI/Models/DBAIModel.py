@@ -9,21 +9,23 @@ from AI.Models.IModel import IModel
 from langchain.chat_models import ChatOpenAI
 from langchain.agents.agent_types import AgentType
 import pyodbc
+import pymysql
+
 
 
 class DBAIModel(IModel):
     _llm: ChatOpenAI
     _agent: create_sql_agent
     _custom_table_schema = {
-        "Clients": """CREATE TABLE Clients (
+        "clients": """CREATE TABLE Clients (
 "Id" INTEGER NOT NULL, 
 "Name" NVARCHAR(200) NOT NULL,
 PRIMARY KEY ("Id")
 )
 """,
     }
-    _custom_sql_prefix = """You are an expert agent designed to interact with a MS SQL database.
-Given an input question, create a syntactically correct MS SQL query to run, 
+    _custom_sql_prefix = """Your name is Careio, You are an expert agent designed to interact with a MySQL database.
+Given an input question, create a syntactically correct MYSQL query to run, 
 then look at the results of the query and return the answer.
 Unless the user specifies a specific number of examples they wish to obtain, 
 always limit your query to at most {top_k} results.
@@ -36,7 +38,7 @@ You MUST double check your query before executing it. If you get an error while 
 rewrite the query and try again.
 Wrap each column name in square brackets ([]) to denote them as delimited identifiers.
 Pay attention to use only the column names you can see in the tables below. Be careful to not query for columns that do not exist. Also, pay attention to which column is in which table.
-Pay attention to use CAST(GETDATE() as date) function to get the current date, if the question involves "today".
+Pay attention to use CAST(NOW() as date) function to get the current date and time, if the question involves "today".
 
 DO NOT make any DML statements (INSERT, UPDATE, DELETE, DROP etc.) to the database.  
 
@@ -84,15 +86,18 @@ Final Answer: the final answer to the original input question."""
 #     )
 
     def __init__(self, llm: ChatOpenAI):
-        driver = 'ODBC+Driver+17+for+SQL+Server'
-        server = 'DESKTOP-P7P68FP'  # 'ROWAD-SERVER'
-        database = 'test'  # 'drAI'
-        username = 'ai'  # 'ai3'
-        password = '12345'
+        # mysql connection
+        conn = "mysql+pymysql://root:@127.0.0.1:3306/careiodb"
 
-        # conn = f'mssql+pyodbc://{username}:{password}@{server}/{database}?driver={driver}'
-        conn = f'mssql+pyodbc:///?driver={driver}&server={server}&database={database}&trusted_connection=yes'
-        db = SQLDatabase.from_uri(conn, include_tables=['Clients', 'Doctors', 'Appointments', 'Specialisms'], custom_table_info=self._custom_table_schema)
+        # sql server connection
+        # driver = 'ODBC+Driver+17+for+SQL+Server'
+        # server = 'DESKTOP-P7P68FP'  # 'ROWAD-SERVER'
+        # database = 'test'  # 'drAI'
+        # username = 'ai'  # 'ai3'
+        # password = '12345'
+        # conn = f'mssql+pyodbc:///?driver={driver}&server={server}&database={database}&trusted_connection=yes'
+
+        db = SQLDatabase.from_uri(conn, include_tables=['patients', 'doctors', 'appointments', 'specialisms', 'degrees', 'qualifications', 'experiences'], custom_table_info=self._custom_table_schema)
         # self._chain = SQLDatabaseChain.from_llm(llm, db, verbose=True, return_direct=False, use_query_checker=True, prompt=self._prompt)
 
         toolkit = SQLDatabaseToolkit(db=db, llm=llm)
@@ -114,8 +119,9 @@ Final Answer: the final answer to the original input question."""
                 """RULES:
 You MUST NOT return "IDs"
 You MUST use "SQL Like Operator" when comparing with string value columns.
-You MUST filter "Appointments" rows by comparing ClientId with keyId.  
-You MUST filter "Clients" rows by comparing Id with keyId. 
+You MUST filter "appointments" rows by comparing ClientId with keyId.  
+You MUST filter "patients" rows by comparing Id with keyId. 
+You MUST NEVER mention the database in your answer whatsoever.
 
 Create Query Based On the RULES.
 Run Query.
