@@ -23,7 +23,7 @@ class SecretaryIFModel(IModel):
         self._ifModel = IfModel(self._llm)
         self._doctor = DoctorAIModel(self._llm)
         self._databaser = DBAIModel(self._llm)
-        self._rules = {"input is about 'appointments' or 'doctors' or 'hospitals'": '1', 'not': '0'}
+        self._rules = {"input is about 'appointments' or 'doctors' or 'health centers'": '1', 'not': '0'}
 
     def handle(self, user_id: int, summary: str, message: str) -> str:
         response = ''

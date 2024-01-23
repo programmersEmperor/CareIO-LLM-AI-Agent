@@ -17,13 +17,52 @@ class DBAIModel(IModel):
     _llm: ChatOpenAI
     _agent: create_sql_agent
     _custom_table_schema = {
-        "clients": """CREATE TABLE Clients (
+        "patients": """CREATE TABLE patients (
 "Id" INTEGER NOT NULL, 
 "Name" NVARCHAR(200) NOT NULL,
 PRIMARY KEY ("Id")
 )
 """,
+        "doctors": """CREATE TABLE doctors (
+    "Id" INTEGER NOT NULL, 
+    "Name" NVARCHAR(200) NOT NULL,
+    "Description"  NVARCHAR(200) NOT NULL,
+    "DegreeId" INTEGER NOT NULL,
+    "SpecialismId" INTEGER NOT NULL,
+    "CompletedAppointments" INTEGER,
+    "Rating" FLOAT NOT NULL,
+    
+    PRIMARY KEY ("Id")
+    FOREIGN KEY ("DegreeId") REFERENCES degrees("Id"),
+    FOREIGN KEY ("SpecialismId") REFERENCES specialisms("Id")
+    )
+    """,
+        "appointments": """CREATE TABLE appointments (
+        "Id" INTEGER NOT NULL, 
+        "Date" DATETIME(6) NOT NULL,
+        "PatientId"  NVARCHAR(200) NOT NULL,
+        "DoctorId" INTEGER NOT NULL,
+        "HealthCenterId" INTEGER NOT NULL,
+
+        PRIMARY KEY ("Id")
+        FOREIGN KEY ("PatientId") REFERENCES patients("Id"),
+        FOREIGN KEY ("DoctorId") REFERENCES doctors("Id")
+        FOREIGN KEY ("HealthCenterId") REFERENCES health_centers("Id")
+        )
+        """,
+        "health_centers": """CREATE TABLE health_centers (
+    "Id" INTEGER NOT NULL, 
+    "Name" DATETIME(6) NOT NULL,
+    "Description"  NVARCHAR(200) NOT NULL,
+    "Address" INTEGER NOT NULL,
+    "Rating" INTEGER NOT NULL,
+    "CompletedAppointments" INTEGER NOT NULL,
+
+    PRIMARY KEY ("Id")
+    )
+    """
     }
+
     _custom_sql_prefix = """Your name is Careio, You are an expert agent designed to interact with a MySQL database.
 Given an input question, create a syntactically correct MYSQL query to run, 
 then look at the results of the query and return the answer.
@@ -87,7 +126,9 @@ Final Answer: the final answer to the original input question."""
 
     def __init__(self, llm: ChatOpenAI):
         # mysql connection
-        conn = "mysql+pymysql://careiodbUser:GnmWj6tEE97hZ24oTuS0@127.0.0.1:3306/careiodb"
+        # conn = "mysql+pymysql://careiodbUser:GnmWj6tEE97hZ24oTuS0@127.0.0.1:3306/careiodb"
+        conn = "mysql+pymysql://root:@127.0.0.1:3306/careiodb"
+
 
         # sql server connection
         # driver = 'ODBC+Driver+17+for+SQL+Server'
@@ -97,7 +138,7 @@ Final Answer: the final answer to the original input question."""
         # password = '12345'
         # conn = f'mssql+pyodbc:///?driver={driver}&server={server}&database={database}&trusted_connection=yes'
 
-        db = SQLDatabase.from_uri(conn, include_tables=['patients', 'doctors', 'appointments', 'specialisms', 'degrees', 'qualifications', 'experiences'], custom_table_info=self._custom_table_schema)
+        db = SQLDatabase.from_uri(conn, include_tables=['patients', 'doctors', 'appointments', 'specialisms', 'degrees', 'qualifications', 'experiences', 'health_centers'], custom_table_info=self._custom_table_schema)
         # self._chain = SQLDatabaseChain.from_llm(llm, db, verbose=True, return_direct=False, use_query_checker=True, prompt=self._prompt)
 
         toolkit = SQLDatabaseToolkit(db=db, llm=llm)
@@ -119,8 +160,10 @@ Final Answer: the final answer to the original input question."""
                 """RULES:
 You MUST NOT return "IDs"
 You MUST use "SQL Like Operator" when comparing with string value columns.
-You MUST filter "appointments" rows by comparing ClientId with keyId.  
-You MUST filter "patients" rows by comparing Id with keyId. 
+You MUST NOT call unnecessary tables.
+You MUST call only the necessary tables.
+You MUST filter "appointments" rows by comparing PatientId with keyId if the question is about the appointments.  
+You MUST filter "patients" rows by comparing Id with keyId if the question is about the patients. 
 You MUST NEVER mention the database in your answer whatsoever.
 
 Create Query Based On the RULES.
